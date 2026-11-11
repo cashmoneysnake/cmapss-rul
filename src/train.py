@@ -26,9 +26,9 @@ def fit_xgboost(data, seed, n_estimators):
     return lambda X: model.predict(window_features(X))
 
 
-def fit_lstm(data, seed, epochs, hidden, lr, batch_size, cap):
+def fit_nn(data, model_name, seed, epochs, hidden, lr, batch_size, cap):
     import torch
-    from src.models.lstm import LSTMRegressor
+    from src.models.factory import build_model
 
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -36,7 +36,7 @@ def fit_lstm(data, seed, epochs, hidden, lr, batch_size, cap):
     X_tr, y_tr = to_t(data.X_train), to_t(data.y_train / cap)   # targets scaled to 0..1
     X_va = to_t(data.X_val)
 
-    model = LSTMRegressor(X_tr.shape[2], hidden=hidden)
+    model = build_model(model_name, X_tr.shape[2], hidden=hidden)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
 
@@ -70,7 +70,7 @@ def fit_lstm(data, seed, epochs, hidden, lr, batch_size, cap):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--subset", default="FD001")
-    ap.add_argument("--model", default="xgboost", choices=["xgboost", "lstm"])
+    ap.add_argument("--model", default="xgboost", choices=["xgboost", "lstm", "gru", "cnn"])
     ap.add_argument("--window", type=int, default=30)
     ap.add_argument("--cap", type=int, default=125)
     ap.add_argument("--seed", type=int, default=0)
@@ -78,10 +78,10 @@ def main():
     ap.add_argument("--split-seed", type=int, default=0,
                     help="seed for the engine train/val split (kept fixed across model seeds)")
     ap.add_argument("--n-estimators", type=int, default=300)   # xgboost
-    ap.add_argument("--epochs", type=int, default=30)          # lstm
-    ap.add_argument("--hidden", type=int, default=64)          # lstm
-    ap.add_argument("--lr", type=float, default=1e-3)          # lstm
-    ap.add_argument("--batch-size", type=int, default=128)     # lstm
+    ap.add_argument("--epochs", type=int, default=30)          # neural nets
+    ap.add_argument("--hidden", type=int, default=64)          # neural nets
+    ap.add_argument("--lr", type=float, default=1e-3)          # neural nets
+    ap.add_argument("--batch-size", type=int, default=128)     # neural nets
     ap.add_argument("--final", action="store_true",
                     help="also score the official test set (do this once per final model)")
     args = ap.parse_args()
@@ -98,8 +98,8 @@ def main():
         if args.model == "xgboost":
             predict = fit_xgboost(data, args.seed, args.n_estimators)
         else:
-            predict = fit_lstm(data, args.seed, args.epochs, args.hidden, args.lr,
-                               args.batch_size, args.cap)
+            predict = fit_nn(data, args.model, args.seed, args.epochs, args.hidden, args.lr,
+                             args.batch_size, args.cap)
 
         # validation: every window of the held-out engines (targets capped)
         y_pred = predict(data.X_val)
