@@ -57,8 +57,10 @@ def main():
         lines += [f"## {subset}", "", "| Model | Window | Seeds | Test RMSE | Test NASA score |",
                   "|---|---|---|---|---|"]
         for _, r in sub.sort_values("rmse_mean").iterrows():
+            rmse_sd = "n/a" if pd.isna(r.rmse_sd) else f"{r.rmse_sd:.2f}"     # one seed has no spread
+            nasa_sd = "n/a" if pd.isna(r.nasa_sd) else f"{r.nasa_sd:,.0f}"
             lines.append(f"| {MODEL_NAMES.get(r.model, r.model)} | {r.window} | {r.seeds} | "
-                         f"{r.rmse_mean:.2f} +- {r.rmse_sd:.2f} | {r.nasa_mean:,.0f} +- {r.nasa_sd:,.0f} |")
+                         f"{r.rmse_mean:.2f} +- {rmse_sd} | {r.nasa_mean:,.0f} +- {nasa_sd} |")
         lines.append("")
     if warnings:
         lines += ["## Warnings", ""] + [f"- {w}" for w in warnings] + [""]

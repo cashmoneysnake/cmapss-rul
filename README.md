@@ -106,7 +106,7 @@ python -m src.train --subset FD004 --model gru --window 70 --seed 0 --save-dir a
 mlflow ui                  # http://127.0.0.1:5000
 ```
 
-Every row in the results tables is one `python -m src.train --subset <FD001|FD004> --model <xgboost|lstm|gru|cnn|transformer> --seed <0|1|2> --final` run (plus `--window 70 --val-min-cycle 100` for the tuned GRU). `make reproduce` and `make reproduce-fast` are placeholders and are not implemented yet.
+Every row in the results tables is one `python -m src.train --subset <FD001|FD004> --model <xgboost|lstm|gru|cnn|transformer> --seed <0|1|2> --final` run (plus `--window 70 --val-min-cycle 100` for the tuned GRU). `make reproduce` runs all of them (3 seeds, both subsets, plus the tuned GRU) into a fresh MLflow store under `reproduce/` and writes `reproduce/results.md`; it takes a few hours on a laptop CPU. `make reproduce-fast` is a reduced run (FD001, one seed, tiny models, a few minutes) used by CI. Results can differ slightly from the tables above on other machines.
 
 Regenerate the results table from MLflow: `python scripts/make_results_table.py`.
 
