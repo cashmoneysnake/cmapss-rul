@@ -1,0 +1,12 @@
+torch
+scikit-learn
+xgboost
+pandas
+numpy
+mlflow
+fastapi
+uvicorn
+pydantic
+pytest
+streamlit
+certifi
