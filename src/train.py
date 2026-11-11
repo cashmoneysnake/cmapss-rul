@@ -26,15 +26,62 @@ def fit_xgboost(data, seed, n_estimators):
     return lambda X: model.predict(window_features(X))
 
 
+def fit_lstm(data, seed, epochs, hidden, lr, batch_size, cap):
+    import torch
+    from src.models.lstm import LSTMRegressor
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    to_t = lambda a: torch.tensor(a, dtype=torch.float32)
+    X_tr, y_tr = to_t(data.X_train), to_t(data.y_train / cap)   # targets scaled to 0..1
+    X_va = to_t(data.X_val)
+
+    model = LSTMRegressor(X_tr.shape[2], hidden=hidden)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = torch.nn.MSELoss()
+
+    def predict(X):
+        model.eval()
+        with torch.no_grad():
+            X = X if torch.is_tensor(X) else to_t(X)
+            out = torch.cat([model(X[i:i + 2048]) for i in range(0, len(X), 2048)])
+        return np.clip(out.numpy() * cap, 0, cap)
+
+    best_rmse, best_state = float("inf"), None
+    for epoch in range(epochs):
+        model.train()
+        perm = torch.randperm(len(X_tr))
+        for i in range(0, len(perm), batch_size):
+            idx = perm[i:i + batch_size]
+            opt.zero_grad()
+            loss = loss_fn(model(X_tr[idx]), y_tr[idx])
+            loss.backward()
+            opt.step()
+        val_rmse = rmse(data.y_val, predict(X_va))
+        mlflow.log_metric("val_rmse_by_epoch", val_rmse, step=epoch)
+        print(f"epoch {epoch + 1:>3}/{epochs}  val_rmse {val_rmse:.2f}")
+        if val_rmse < best_rmse:   # keep the best epoch, chosen on validation only
+            best_rmse = val_rmse
+            best_state = {k: v.clone() for k, v in model.state_dict().items()}
+    model.load_state_dict(best_state)
+    return predict
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--subset", default="FD001")
-    ap.add_argument("--model", default="xgboost", choices=["xgboost"])
+    ap.add_argument("--model", default="xgboost", choices=["xgboost", "lstm"])
     ap.add_argument("--window", type=int, default=30)
     ap.add_argument("--cap", type=int, default=125)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--val-frac", type=float, default=0.2)
-    ap.add_argument("--n-estimators", type=int, default=300)
+    ap.add_argument("--split-seed", type=int, default=0,
+                    help="seed for the engine train/val split (kept fixed across model seeds)")
+    ap.add_argument("--n-estimators", type=int, default=300)   # xgboost
+    ap.add_argument("--epochs", type=int, default=30)          # lstm
+    ap.add_argument("--hidden", type=int, default=64)          # lstm
+    ap.add_argument("--lr", type=float, default=1e-3)          # lstm
+    ap.add_argument("--batch-size", type=int, default=128)     # lstm
     ap.add_argument("--final", action="store_true",
                     help="also score the official test set (do this once per final model)")
     args = ap.parse_args()
@@ -43,12 +90,16 @@ def main():
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", f"sqlite:///{ROOT / 'mlflow.db'}"))
     mlflow.set_experiment("cmapss-rul")
 
-    data = build_datasets(args.subset, args.window, args.cap, args.seed, args.val_frac)
+    data = build_datasets(args.subset, args.window, args.cap, args.split_seed, args.val_frac)
     print(f"train windows {data.X_train.shape}, val windows {data.X_val.shape}")
 
     with mlflow.start_run(run_name=f"{args.model}-{args.subset}-seed{args.seed}"):
         mlflow.log_params({**vars(args), "n_features": len(data.feature_cols)})
-        predict = fit_xgboost(data, args.seed, args.n_estimators)
+        if args.model == "xgboost":
+            predict = fit_xgboost(data, args.seed, args.n_estimators)
+        else:
+            predict = fit_lstm(data, args.seed, args.epochs, args.hidden, args.lr,
+                               args.batch_size, args.cap)
 
         # validation: every window of the held-out engines (targets capped)
         y_pred = predict(data.X_val)

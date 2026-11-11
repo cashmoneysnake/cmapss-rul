@@ -2,11 +2,14 @@
 from dataclasses import dataclass
 
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 
 from src.data.loading import (SENSOR_COLS, add_rul, constant_sensors, engine_arrays,
                               load_split, load_test_rul, split_units)
+from src.data.scaling import ConditionScaler
 from src.data.windowing import make_targets, make_windows
+
+
+N_CONDITIONS = {"FD001": 1, "FD002": 6, "FD003": 1, "FD004": 6}
 
 
 @dataclass
@@ -38,14 +41,14 @@ def build_datasets(subset: str, window: int = 30, cap: int = 125,
     # split by whole engine, then fit the scaler on TRAIN engines only
     train_units, val_units = split_units(train_df["unit"].unique(), val_frac, seed)
     tr_df = train_df[train_df["unit"].isin(train_units)]
-    scaler = StandardScaler().fit(tr_df[feature_cols])
+    scaler = ConditionScaler(N_CONDITIONS[subset]).fit(tr_df, feature_cols)
 
-    def scaled(df):
-        out = df.copy()
-        out[feature_cols] = scaler.transform(df[feature_cols])
-        return out
+    train_s, test_s = scaler.transform(train_df), scaler.transform(test_df)
 
-    train_s, test_s = scaled(train_df), scaled(test_df)
+    # drop sensors with zero variance AFTER per-condition scaling (judged on train engines only).
+    # In FD002/FD004 some sensors only encode the operating condition and are flat inside each one.
+    train_part = train_s[train_s["unit"].isin(train_units)]
+    feature_cols = [c for c in feature_cols if train_part[c].std() > 1e-6]
     rul_by_unit = {u: g.sort_values("cycle")["rul"].to_numpy()
                    for u, g in train_df.groupby("unit")}
 
