@@ -18,17 +18,19 @@ class Datasets:
     y_train: np.ndarray       # capped RUL
     X_val: np.ndarray
     y_val: np.ndarray
+    val_end_cycle: np.ndarray  # cycle number each validation window ends at
     test_engines: dict        # {unit: (n_cycles, n_features)}, scaled with train statistics
     test_rul: np.ndarray      # NASA's true RUL, in unit order
     feature_cols: list
 
 
 def _windows_for(arrays: dict, rul_by_unit: dict, window: int, cap: int):
-    X, y = [], []
+    X, y, end = [], [], []
     for u, feats in arrays.items():
         X.append(make_windows(feats, window))
         y.append(make_targets(rul_by_unit[u], window, cap))
-    return np.concatenate(X), np.concatenate(y)
+        end.append(np.arange(window, len(feats) + 1))   # window i ends at cycle window + i
+    return np.concatenate(X), np.concatenate(y), np.concatenate(end)
 
 
 def build_datasets(subset: str, window: int = 30, cap: int = 125,
@@ -52,9 +54,9 @@ def build_datasets(subset: str, window: int = 30, cap: int = 125,
     rul_by_unit = {u: g.sort_values("cycle")["rul"].to_numpy()
                    for u, g in train_df.groupby("unit")}
 
-    X_tr, y_tr = _windows_for(engine_arrays(train_s, feature_cols, train_units),
+    X_tr, y_tr, _ = _windows_for(engine_arrays(train_s, feature_cols, train_units),
                               rul_by_unit, window, cap)
-    X_va, y_va = _windows_for(engine_arrays(train_s, feature_cols, val_units),
+    X_va, y_va, end_va = _windows_for(engine_arrays(train_s, feature_cols, val_units),
                               rul_by_unit, window, cap)
-    return Datasets(X_tr, y_tr, X_va, y_va,
+    return Datasets(X_tr, y_tr, X_va, y_va, end_va,
                     engine_arrays(test_s, feature_cols), load_test_rul(subset), feature_cols)

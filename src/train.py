@@ -82,6 +82,9 @@ def main():
     ap.add_argument("--hidden", type=int, default=64)          # neural nets
     ap.add_argument("--lr", type=float, default=1e-3)          # neural nets
     ap.add_argument("--batch-size", type=int, default=128)     # neural nets
+    ap.add_argument("--val-min-cycle", type=int, default=0,
+                    help="also report validation metrics (_common) on windows ending at or after this "
+                         "cycle, so different window lengths are scored on the same targets")
     ap.add_argument("--final", action="store_true",
                     help="also score the official test set (do this once per final model)")
     args = ap.parse_args()
@@ -93,7 +96,7 @@ def main():
     data = build_datasets(args.subset, args.window, args.cap, args.split_seed, args.val_frac)
     print(f"train windows {data.X_train.shape}, val windows {data.X_val.shape}")
 
-    with mlflow.start_run(run_name=f"{args.model}-{args.subset}-seed{args.seed}"):
+    with mlflow.start_run(run_name=f"{args.model}-{args.subset}-w{args.window}-seed{args.seed}"):
         mlflow.log_params({**vars(args), "n_features": len(data.feature_cols)})
         if args.model == "xgboost":
             predict = fit_xgboost(data, args.seed, args.n_estimators)
@@ -108,6 +111,11 @@ def main():
         if args.final:
             test = score_test_set(predict, data.test_engines, data.test_rul, args.window)
             metrics.update({f"test_{k}": v for k, v in test.items()})
+        if args.val_min_cycle:
+            keep = data.val_end_cycle >= args.val_min_cycle
+            metrics["val_rmse_common"] = rmse(data.y_val[keep], y_pred[keep])
+            metrics["val_nasa_score_common"] = nasa_score(data.y_val[keep], y_pred[keep])
+            metrics["val_windows_common"] = float(keep.sum())
         mlflow.log_metrics(metrics)
         print({k: round(v, 2) for k, v in metrics.items()})
 
