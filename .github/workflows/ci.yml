@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install pytest numpy pandas scikit-learn xgboost certifi fastapi httpx
+          pip install pytest numpy pandas scikit-learn xgboost certifi fastapi httpx mlflow
       - name: Tests
         run: make test
       - name: Fast end-to-end check

@@ -9,3 +9,5 @@ mlflow.db
 *.db
 mlflow.db-journal
 !artifacts/**/*.pt
+reproduce/
+reproduce_fast/
