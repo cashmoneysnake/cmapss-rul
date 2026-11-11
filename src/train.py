@@ -5,6 +5,7 @@ Examples (from the repo root):
     python -m src.train --subset FD001 --model xgboost --seed 0 --final   # also scores the test set
 """
 import argparse
+import json
 import os
 from pathlib import Path
 
@@ -23,7 +24,7 @@ def fit_xgboost(data, seed, n_estimators):
     model = XGBRegressor(n_estimators=n_estimators, learning_rate=0.05, max_depth=5,
                          subsample=0.8, colsample_bytree=0.8, random_state=seed, n_jobs=-1)
     model.fit(window_features(data.X_train), data.y_train)
-    return lambda X: model.predict(window_features(X))
+    return (lambda X: model.predict(window_features(X))), None
 
 
 def fit_nn(data, model_name, seed, epochs, hidden, lr, batch_size, cap):
@@ -64,7 +65,22 @@ def fit_nn(data, model_name, seed, epochs, hidden, lr, batch_size, cap):
             best_rmse = val_rmse
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
     model.load_state_dict(best_state)
-    return predict
+    return predict, model
+
+
+def save_bundle(out: Path, model, data, args):
+    """Save everything the API needs: weights, scaler statistics, and the settings used."""
+    import torch
+    if model is None:
+        raise SystemExit("--save-dir only works for neural models (lstm, gru, cnn, transformer)")
+    out.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), out / "model.pt")
+    (out / "scaler.json").write_text(json.dumps(data.scaler.to_dict()))
+    (out / "config.json").write_text(json.dumps({
+        "model": args.model, "subset": args.subset, "window": args.window, "cap": args.cap,
+        "hidden": args.hidden, "seed": args.seed, "n_features": len(data.feature_cols),
+        "feature_cols": data.feature_cols}, indent=2))
+    print(f"saved serving bundle to {out}")
 
 
 def main():
@@ -85,6 +101,8 @@ def main():
     ap.add_argument("--val-min-cycle", type=int, default=0,
                     help="also report validation metrics (_common) on windows ending at or after this "
                          "cycle, so different window lengths are scored on the same targets")
+    ap.add_argument("--save-dir", default="",
+                    help="neural models only: save weights, scaler and config here for the API")
     ap.add_argument("--final", action="store_true",
                     help="also score the official test set (do this once per final model)")
     args = ap.parse_args()
@@ -99,10 +117,10 @@ def main():
     with mlflow.start_run(run_name=f"{args.model}-{args.subset}-w{args.window}-seed{args.seed}"):
         mlflow.log_params({**vars(args), "n_features": len(data.feature_cols)})
         if args.model == "xgboost":
-            predict = fit_xgboost(data, args.seed, args.n_estimators)
+            predict, model = fit_xgboost(data, args.seed, args.n_estimators)
         else:
-            predict = fit_nn(data, args.model, args.seed, args.epochs, args.hidden, args.lr,
-                             args.batch_size, args.cap)
+            predict, model = fit_nn(data, args.model, args.seed, args.epochs, args.hidden,
+                                    args.lr, args.batch_size, args.cap)
 
         # validation: every window of the held-out engines (targets capped)
         y_pred = predict(data.X_val)
@@ -116,6 +134,8 @@ def main():
             metrics["val_rmse_common"] = rmse(data.y_val[keep], y_pred[keep])
             metrics["val_nasa_score_common"] = nasa_score(data.y_val[keep], y_pred[keep])
             metrics["val_windows_common"] = float(keep.sum())
+        if args.save_dir:
+            save_bundle(Path(args.save_dir), model, data, args)
         mlflow.log_metrics(metrics)
         print({k: round(v, 2) for k, v in metrics.items()})
 

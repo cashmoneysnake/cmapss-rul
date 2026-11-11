@@ -10,3 +10,4 @@ pydantic
 pytest
 streamlit
 certifi
+httpx

@@ -8,3 +8,4 @@ mlruns/
 mlflow.db
 *.db
 mlflow.db-journal
+!artifacts/**/*.pt

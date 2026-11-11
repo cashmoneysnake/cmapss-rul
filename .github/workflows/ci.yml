@@ -14,9 +14,38 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
-        # Light set for now. Add torch (CPU wheel) when the tests need it.
-        run: pip install pytest numpy pandas scikit-learn xgboost certifi
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install pytest numpy pandas scikit-learn xgboost certifi fastapi httpx
       - name: Tests
         run: make test
       - name: Fast end-to-end check
         run: make reproduce-fast
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t cmapss-rul .
+      - name: Start container
+        run: docker run -d --name rul -p 8000:8000 cmapss-rul
+      - name: Wait for the API and check /health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/health && exit 0
+            sleep 2
+          done
+          docker logs rul
+          exit 1
+      - name: Request a prediction
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          body = json.dumps({"cycles": [[0.0] * 24] * 5}).encode()
+          req = urllib.request.Request("http://127.0.0.1:8000/predict", body,
+                                       {"Content-Type": "application/json"})
+          out = json.load(urllib.request.urlopen(req))
+          print(out)
+          assert 0 <= out["rul"] <= 125
+          PY

@@ -22,6 +22,7 @@ class Datasets:
     test_engines: dict        # {unit: (n_cycles, n_features)}, scaled with train statistics
     test_rul: np.ndarray      # NASA's true RUL, in unit order
     feature_cols: list
+    scaler: object = None
 
 
 def _windows_for(arrays: dict, rul_by_unit: dict, window: int, cap: int):
@@ -59,4 +60,4 @@ def build_datasets(subset: str, window: int = 30, cap: int = 125,
     X_va, y_va, end_va = _windows_for(engine_arrays(train_s, feature_cols, val_units),
                               rul_by_unit, window, cap)
     return Datasets(X_tr, y_tr, X_va, y_va, end_va,
-                    engine_arrays(test_s, feature_cols), load_test_rul(subset), feature_cols)
+                    engine_arrays(test_s, feature_cols), load_test_rul(subset), feature_cols, scaler)

@@ -1,0 +1,6 @@
+# Runtime dependencies for the API image (torch CPU is installed separately in the Dockerfile)
+fastapi
+uvicorn
+pydantic
+numpy
+pandas

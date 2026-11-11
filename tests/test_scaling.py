@@ -46,3 +46,11 @@ def test_sensor_flat_inside_each_condition_scales_to_zero_not_noise():
     df["s_5"] = np.where(cond == 0, 14.62, 21.61)   # differs by condition, flat inside each
     out = ConditionScaler(2).fit(df, ["s_2", "s_5"]).transform(df)
     assert out["s_5"].abs().max() < 1e-6
+
+
+def test_json_round_trip_gives_identical_output_without_sklearn_kmeans():
+    df, _ = two_condition_df()
+    sc = ConditionScaler(2).fit(df, ["s_2"])
+    clone = ConditionScaler.from_dict(sc.to_dict())
+    assert (clone._assign(df) == sc.kmeans_.predict(df[SETTING_COLS].to_numpy())).all()
+    assert np.allclose(clone.transform(df)["s_2"], sc.transform(df)["s_2"])
