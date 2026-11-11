@@ -70,7 +70,7 @@ def fit_nn(data, model_name, seed, epochs, hidden, lr, batch_size, cap):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--subset", default="FD001")
-    ap.add_argument("--model", default="xgboost", choices=["xgboost", "lstm", "gru", "cnn"])
+    ap.add_argument("--model", default="xgboost", choices=["xgboost", "lstm", "gru", "cnn", "transformer"])
     ap.add_argument("--window", type=int, default=30)
     ap.add_argument("--cap", type=int, default=125)
     ap.add_argument("--seed", type=int, default=0)

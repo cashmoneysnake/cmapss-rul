@@ -11,4 +11,7 @@ def build_model(name: str, n_features: int, hidden: int = 64):
     if name == "cnn":
         from src.models.cnn import CNNRegressor
         return CNNRegressor(n_features, hidden=hidden)
+    if name == "transformer":
+        from src.models.transformer import TransformerRegressor
+        return TransformerRegressor(n_features, hidden=hidden)
     raise ValueError(f"unknown model: {name}")
