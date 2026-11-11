@@ -1,5 +1,5 @@
 .venv/
-data/
+/data/
 __pycache__/
 .DS_Store
 mlruns/
@@ -7,3 +7,4 @@ mlruns/
 *.zip
 mlflow.db
 *.db
+mlflow.db-journal
