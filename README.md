@@ -1,5 +1,7 @@
 # cmapss-rul: remaining useful life of turbofan engines
 
+[![CI](https://github.com/cashmoneysnake/cmapss-rul/actions/workflows/ci.yml/badge.svg)](https://github.com/cashmoneysnake/cmapss-rul/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Predicts how many operating cycles an engine has left before failure from its sensor history, using NASA's C-MAPSS turbofan data. Compares an XGBoost baseline against four neural architectures (LSTM, GRU, 1D-CNN, small Transformer) in PyTorch, tracks every run in MLflow, and serves the best model through a FastAPI service in Docker.
 
 Predictive maintenance is a common machine-learning use case in energy and aviation: knowing an engine is close to failure lets you schedule repair instead of reacting to a breakdown.
@@ -92,7 +94,11 @@ On FD004 this project is clearly worse than that preprint, and I have not diagno
 
 ## Run it
 
+Requires Python 3.10 or newer, git, and (only for the container) Docker.
+
 ```bash
+git clone https://github.com/cashmoneysnake/cmapss-rul.git
+cd cmapss-rul
 make setup                 # virtualenv and dependencies
 source .venv/bin/activate
 make data                  # download and verify the NASA files into data/raw/
@@ -148,3 +154,7 @@ tests/          pytest suite
 ```
 
 Data: NASA Prognostics Data Repository, Turbofan Engine Degradation Simulation (C-MAPSS), [data set #6](https://www.nasa.gov/content/prognostics-center-of-excellence-data-set-repository).
+
+## License
+
+MIT, see [`LICENSE`](LICENSE). Anyone may use, copy, modify, and distribute this code. The C-MAPSS data is published by NASA and is downloaded separately by the script, not included in this repository.
